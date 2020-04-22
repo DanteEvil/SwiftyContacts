@@ -1,5 +1,6 @@
 import Foundation
 import Contacts
+import RxSwift
 
 #if os(OSX)
 import Cocoa
@@ -510,4 +511,52 @@ public func makeCall(CNPhoneNumber: CNPhoneNumber) {
     }
 }
 
+#endif
+
+// MARK: Rx functions
+#if os(iOS) || os(OSX)
+public func rx_authorizationStatus() -> Observable<CNAuthorizationStatus> {
+    return Observable.create { (observer) -> Disposable in
+        authorizationStatus { (status) in
+            observer.onNext(status)
+            observer.onCompleted()
+        }
+        return Disposables.create()
+    }
+}
+
+public func rx_requestAccess() -> Observable<Bool> {
+    return Observable.create { (observer) -> Disposable in
+        requestAccess { (isGranted) in
+            observer.onNext(isGranted)
+            observer.onCompleted()
+        }
+        return Disposables.create()
+    }
+}
+
+public func rx_fetchContactsWithEmail() -> Observable<[CNContact]> {
+    return Observable.create({ (observer) -> Disposable in
+        let contactStore: CNContactStore = CNContactStore()
+        var contacts: [CNContact] = [CNContact]()
+        let keysToFetch = [CNContactFormatter.descriptorForRequiredKeys(for: .fullName),
+                           CNContactIdentifierKey,
+                           CNContactPhoneNumbersKey,
+                           CNContactEmailAddressesKey,
+                           CNContactThumbnailImageDataKey] as! [CNKeyDescriptor]
+        do {
+            let allContainers: [CNContainer] = try contactStore.containers(matching: nil)
+            for container in allContainers {
+                let unifiedContacts = try contactStore.unifiedContacts(matching: CNContact.predicateForContactsInContainer(withIdentifier: container.identifier), keysToFetch: keysToFetch)
+                contacts.append(contentsOf: unifiedContacts)
+            }
+            observer.onNext(contacts)
+            observer.onCompleted()
+
+        } catch {
+            observer.onError(error)
+        }
+        return Disposables.create()
+    })
+}
 #endif
